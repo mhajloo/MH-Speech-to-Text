@@ -2,7 +2,7 @@
 
 Python packages are found by checking which of them PyInstaller actually put in
 the build, and their license files are copied from the installed metadata; the
-model, font, word lists and NVIDIA libraries are described by hand.
+models, whisper.cpp, font, word lists and NVIDIA libraries are described by hand.
 
 Usage (after a PyInstaller build): .venv/Scripts/python tools/make_notice.py
 """
@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build" / "dist" / "MH-Speech to Text" / "_internal"
 WORK = ROOT / "build" / "work" / "mhstt"
 OUT = ROOT / "assets" / "NOTICE.txt"
+WHISPERCPP_LICENSE = ROOT / "build_cache" / "whisper.cpp" / "LICENSE"  # tools/build_whispercpp.py
 sys.path.insert(0, str(ROOT))
 from dictation.branding import APP_NAME, APP_VERSION, AUTHOR_EN, GITHUB, WEBSITE  # noqa: E402
 
@@ -32,8 +33,17 @@ Components that are not Python packages
 ---------------------------------------
 * Speech model: OpenAI Whisper large-v3 (MIT License, https://github.com/openai/whisper),
   Persian fine-tune "AmirMohseni/whisper-large-v3-persian-ct2-int8" (Apache License 2.0,
-  https://huggingface.co/AmirMohseni/whisper-large-v3-persian-ct2-int8). The model is
-  downloaded on first use and is not part of the installer.
+  https://huggingface.co/AmirMohseni/whisper-large-v3-persian-ct2-int8). For AMD and Intel
+  graphics cards the same fine-tune comes in whisper.cpp's format, converted by this project
+  (tools/convert_ggml.py) from "AmirMohseni/whisper-large-v3-persian-bf16", the checkpoint
+  the model above was made from, which is based on
+  "MohammadGholizadeh/whisper-large-v3-persian-common-voice-17" (Apache License 2.0).
+  The models are downloaded on first use and are not part of the installer.
+* whisper.cpp and ggml (whispercpp/whisper.dll, ggml*.dll): MIT License, Copyright (c)
+  2023-2026 The ggml authors, https://github.com/ggml-org/whisper.cpp (full text below).
+  ggml-vulkan.dll contains the Khronos Group's Vulkan C++ headers (Apache License 2.0 or
+  MIT, https://github.com/KhronosGroup/Vulkan-Hpp). The Vulkan loader (vulkan-1.dll) is not
+  included: it comes with the graphics driver.
 * NVIDIA cuBLAS (cublas64_12.dll, cublasLt64_12.dll) is NOT included in the installer. On PCs
   with an NVIDIA GPU the app downloads it on first use; it is licensed under the NVIDIA CUDA
   Toolkit End User License Agreement, https://docs.nvidia.com/cuda/eula/
@@ -93,6 +103,8 @@ def license_texts(dist):
 
 
 def main():
+    if not WHISPERCPP_LICENSE.exists():
+        sys.exit(f"{WHISPERCPP_LICENSE} not found: run tools/build_whispercpp.py")
     dists = bundled_distributions()
     parts = [HEADER]
     for d in dists:
@@ -103,6 +115,8 @@ def main():
         lic = m.get("License-Expression") or first_line or ", ".join(classifiers) or "see text"
         parts.append(f"* {m['Name']} {d.version}: {lic}  {m.get('Home-page') or ''}".rstrip())
     parts.append("\n\nLicense texts\n=============\n")
+    ggml = WHISPERCPP_LICENSE.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+    parts.append(f"\n----- whisper.cpp and ggml (LICENSE) -----\n\n{ggml}\n")
     for d in dists:
         for path, text in license_texts(d):
             parts.append(f"\n----- {d.metadata['Name']} ({path}) -----\n\n{text}\n")

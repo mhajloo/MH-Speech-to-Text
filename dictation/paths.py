@@ -15,11 +15,13 @@ FROZEN = bool(getattr(sys, "frozen", False))
 if FROZEN:
     APP_ROOT = Path(sys.executable).resolve().parent
     ASSETS_DIR = Path(getattr(sys, "_MEIPASS", APP_ROOT)) / "assets"
+    WHISPERCPP_DIR = Path(getattr(sys, "_MEIPASS", APP_ROOT)) / "whispercpp"
     DATA_DIR = Path(os.environ.get("APPDATA") or APP_ROOT) / APP_DIR_NAME
     MODELS_DIR = Path(os.environ.get("LOCALAPPDATA") or APP_ROOT) / APP_DIR_NAME / "models"
 else:
     APP_ROOT = Path(__file__).resolve().parent.parent
     ASSETS_DIR = APP_ROOT / "assets"
+    WHISPERCPP_DIR = APP_ROOT / "build_cache" / "whispercpp" / "bin"  # tools/build_whispercpp.py
     DATA_DIR = APP_ROOT
     MODELS_DIR = APP_ROOT / "models"
 GPU_DIR = MODELS_DIR.parent / "gpu"  # the downloaded NVIDIA cuBLAS DLLs

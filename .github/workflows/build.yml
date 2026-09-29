@@ -28,6 +28,21 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
+      # headers and shader compiler for whisper.cpp's graphics-card (Vulkan) backend;
+      # the hash is the one in winget's manifest for this version
+      - name: Install Vulkan SDK
+        env:
+          VULKAN_VERSION: "1.4.357.0"
+          VULKAN_SHA256: "81F474711E9042F4CD22B31B2F7A8870DB2E428B21586FB43DD80150BE97310D"
+        run: |
+          $exe = "$env:RUNNER_TEMP\vulkansdk.exe"
+          $root = "C:\VulkanSDK\$env:VULKAN_VERSION"
+          curl.exe -fsSL -o $exe "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          if ((Get-FileHash $exe -Algorithm SHA256).Hash -ne $env:VULKAN_SHA256) { throw "Vulkan SDK installer: wrong SHA-256" }
+          $p = Start-Process $exe -Wait -PassThru -ArgumentList "--root", $root, "--accept-licenses", "--default-answer", "--confirm-command", "install"
+          if ($p.ExitCode) { throw "Vulkan SDK installer failed ($($p.ExitCode))" }
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=$root"
+
       - name: Build app and installer
         run: python tools/build.py
 

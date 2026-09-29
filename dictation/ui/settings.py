@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QFrame, QHB
                                QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget)
 
-from .. import autostart, modelstore, sysinfo
+from .. import autostart, devices, modelstore
 from ..branding import (APP_DESCRIPTION, APP_NAME, APP_TAGLINE, APP_VERSION, AUTHOR, GITHUB,
                         GITHUB_LABEL, LICENSE_NAME, WEBSITE, WEBSITE_LABEL)
 from ..hotkey import check_combo
@@ -33,7 +33,7 @@ ABOUT_TEXT = [
 
 CREDITS = [
     ("مدل گفتار", "Whisper از OpenAI، نسخه‌ی فارسی AmirMohseni", "Apache-2.0"),
-    ("موتور تبدیل", "faster-whisper و CTranslate2", "MIT"),
+    ("موتور تبدیل", "faster-whisper، CTranslate2 و whisper.cpp", "MIT"),
     ("رابط کاربری", "Qt و PySide6", "LGPL-3.0"),
     ("قلم", "وزیرمتن، طراحی زنده‌یاد صابر راستی‌کردار", "OFL-1.1"),
     ("واژه‌های نیم‌فاصله", "Hazm و Common Voice", "MIT / CC0"),
@@ -432,20 +432,29 @@ class SettingsWindow(QWidget):
         card.add(self.model_status)
         page.col.addWidget(card)
 
+        card = Card()
+        self.device_combo = QComboBox()
+        self.device_combo.setMinimumWidth(280)
+        self.device_combo.activated.connect(self._device_chosen)
+        card.add(SettingRow("پردازش گفتار روی", "«خودکار» کارت گرافیک جداگانه را به کار می‌برد و اگر "
+                                                "نباشد، پردازنده را.", self.device_combo))
+        self.device_msg = label("", "Hint", wrap=True)
+        card.add(self.device_msg)
+        row = QHBoxLayout()
+        self.device_btn = QPushButton("دانلود اجزای لازم")
+        self.device_btn.setObjectName("Primary")
+        self.device_btn.setIcon(line_icon("download", "#ffffff"))
+        self.device_btn.clicked.connect(lambda: self.app.open_wizard("model"))
+        row.addWidget(self.device_btn)
+        row.addStretch(1)
+        card.add(row)
+        page.col.addWidget(card)
+
         self.gpu_card = Card(modelstore.GPU_PACK_TITLE,
-                             "کتابخانه‌ی cuBLAS از NVIDIA که تبدیل را روی کارت گرافیک چند برابر سریع‌تر "
-                             "می‌کند. جداگانه دانلود می‌شود، چون متن‌باز نیست و فقط به کار کامپیوترهای "
-                             "دارای کارت گرافیک NVIDIA می‌آید.")
+                             "کتابخانه‌ی cuBLAS از NVIDIA که تبدیل را روی کارت گرافیک NVIDIA چند برابر "
+                             "سریع‌تر می‌کند. جداگانه دانلود می‌شود، چون متن‌باز نیست.")
         self.gpu_status = label("", "Hint", wrap=True)
         self.gpu_card.add(self.gpu_status)
-        row = QHBoxLayout()
-        self.gpu_btn = QPushButton("دانلود شتاب‌دهنده")
-        self.gpu_btn.setObjectName("Primary")
-        self.gpu_btn.setIcon(line_icon("download", "#ffffff"))
-        self.gpu_btn.clicked.connect(lambda: self.app.open_wizard("model"))
-        row.addWidget(self.gpu_btn)
-        row.addStretch(1)
-        self.gpu_card.add(row)
         page.col.addWidget(self.gpu_card)
 
         card = Card("مدل‌های نصب‌شده")
@@ -454,17 +463,12 @@ class SettingsWindow(QWidget):
         self.model_group = QButtonGroup(self)
         self.model_group.idClicked.connect(self._model_clicked)
         row = QHBoxLayout()
-        self.download_btn = QPushButton("دانلود مدل پیشنهادی")
-        self.download_btn.setObjectName("Primary")
-        self.download_btn.setIcon(line_icon("download", "#ffffff"))
-        self.download_btn.clicked.connect(lambda: self.app.open_wizard("model"))
-        imp = QPushButton("افزودن از فایل zip…")
+        imp = QPushButton("افزودن از فایل…")
         imp.setIcon(line_icon("plus", c("text")))
         imp.clicked.connect(self._import_zip)
         folder = QPushButton("افزودن از پوشه…")
         folder.setIcon(line_icon("folder", c("text")))
         folder.clicked.connect(self._import_folder)
-        row.addWidget(self.download_btn)
         row.addWidget(imp)
         row.addWidget(folder)
         row.addStretch(1)
@@ -506,16 +510,41 @@ class SettingsWindow(QWidget):
             self.models_box.addWidget(rb)
         if not self._model_ids:
             self.models_box.addWidget(label("هنوز مدلی نصب نشده است.", "Warning"))
-        self.download_btn.setVisible(not modelstore.is_installed(modelstore.DEFAULT_MODEL))
+        self._refresh_device()
 
-        gpu = sysinfo.nvidia_gpu()
+    def _refresh_device(self):
+        device = self.app.cfg.device
+        combo = self.device_combo
+        combo.blockSignals(True)
+        combo.clear()
+        for value, text in devices.options():
+            combo.addItem(text, value)
+        if combo.findData(device) < 0:  # a card that has been removed
+            combo.addItem(f"کارت گرافیک {device[4:]} (پیدا نشد)", device)
+        combo.setCurrentIndex(combo.findData(device))
+        combo.blockSignals(False)
+
+        _, pack = devices.requirements(device)
+        need = devices.needs(device)
+        parts = []
+        if need["model"]:
+            info = modelstore.catalog_entry(need["model"])
+            parts.append(f"«{info.title}» ({modelstore.size_text(info.size)})")
+        if need["gpu_pack"]:
+            parts.append(f"«{modelstore.GPU_PACK_TITLE}» ({modelstore.size_text(modelstore.GPU_SOURCES[0][2])})")
+        set_msg(self.device_msg, f"برای این انتخاب، {' و '.join(parts)} لازم است." if parts else "", "Warning")
+        self.device_btn.setVisible(bool(parts))
+
         installed = modelstore.gpu_pack_installed()
-        self.gpu_card.setVisible(gpu is not None)
-        self.gpu_btn.setVisible(gpu is not None and not installed)
-        if installed:
-            set_msg(self.gpu_status, "نصب شده است.", "Success")
-        else:
-            set_msg(self.gpu_status, "نصب نشده؛ فعلاً تبدیل روی پردازنده و کندتر انجام می‌شود.", "Warning")
+        self.gpu_card.setVisible(pack)
+        set_msg(self.gpu_status, "نصب شده است." if installed else "نصب نشده است.",
+                "Success" if installed else "Warning")
+
+    def _device_chosen(self, i):
+        device = self.device_combo.itemData(i)
+        if device and device != self.app.cfg.device:
+            self.app.set_device(device)
+        self._refresh_device()
 
     def _model_clicked(self, i):
         mid = self._model_ids[i]
@@ -524,7 +553,7 @@ class SettingsWindow(QWidget):
 
     def _import_zip(self):
         path, _ = QFileDialog.getOpenFileName(self, "انتخاب فایل مدل یا شتاب‌دهنده", "",
-                                              "فایل zip (*.zip *.whl)")
+                                              "فایل zip یا مدل (*.zip *.whl *.bin)")
         if path:
             self._run_import(path)
 

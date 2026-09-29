@@ -1,9 +1,13 @@
 """Downloadable parts of the app: speech models and the NVIDIA GPU pack.
 
-Neither ships in the installer: the model is 1.6 GB, and NVIDIA's cuBLAS is
+Neither ships in the installer: a model is 1.6 GB, and NVIDIA's cuBLAS is
 proprietary (the installer contains only open-source code) and only useful on
 PCs with an NVIDIA graphics card. Both are fetched on first run, first from the
 project's own site, then from public mirrors.
+
+The same Persian model comes in two formats: "ct2" (a folder, for CTranslate2:
+NVIDIA cards and the CPU) and "ggml" (one file, for whisper.cpp: AMD, Intel and
+NVIDIA cards through Vulkan). dictation/devices.py decides which one is needed.
 
 Downloads resume after an interruption, fall back to the next source when one
 fails, and check sizes and SHA-256 hashes before anything is used, so a broken
@@ -31,9 +35,10 @@ class ModelInfo:
     id: str
     title: str
     description: str
-    repo: str
-    revision: str
+    repo: str | None       # Hugging Face repository (mirrors); None: only the app's site
+    revision: str | None
     files: dict = field(default_factory=dict)  # name -> (size, sha256 or None)
+    kind: str = "ct2"      # "ct2": CTranslate2 folder; "ggml": whisper.cpp file
 
     @property
     def size(self) -> int:
@@ -45,7 +50,7 @@ CATALOG = [
         id="fa-amirmohseni-large-v3",
         title="فارسی دقیق (Whisper large-v3)",
         description="دقیق‌ترین مدل در آزمایش‌ها؛ کلمات محاوره را همان‌طور که گفته می‌شوند می‌نویسد. "
-                    "به کارت گرافیک NVIDIA نیاز دارد.",
+                    "برای کارت گرافیک NVIDIA و پردازنده.",
         repo="AmirMohseni/whisper-large-v3-persian-ct2-int8",
         revision="5f850f99dc4db15a526e42b73027481a9f24327d",
         files={
@@ -55,6 +60,21 @@ CATALOG = [
             "vocabulary.json": (1068114, "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"),
             "preprocessor_config.json": (340, "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"),
         },
+    ),
+    # the same model for whisper.cpp: AmirMohseni/whisper-large-v3-persian-bf16 (the
+    # checkpoint the model above was made from, revision e284f469) converted with
+    # tools/convert_ggml.py, then quantized with whisper-quantize q8_0
+    ModelInfo(
+        id="fa-amirmohseni-large-v3-ggml",
+        title="فارسی دقیق برای کارت‌های AMD و Intel",
+        description="همان مدل فارسی دقیق، در قالب whisper.cpp؛ روی کارت گرافیک AMD، Intel "
+                    "یا NVIDIA کار می‌کند.",
+        repo=None,
+        revision=None,
+        files={
+            "ggml-model-q8_0.bin": (1656538283, "4ca860436e2d198dce8298bb63f1b7b26fddee52110fe1b8a80235664ea12c92"),
+        },
+        kind="ggml",
     ),
 ]
 DEFAULT_MODEL = CATALOG[0].id
@@ -87,14 +107,32 @@ def model_dir(model_id) -> Path:
     return MODELS_DIR / model_id
 
 
+def model_kind(model_id) -> str:
+    info = catalog_entry(model_id)
+    if info:
+        return info.kind
+    return "ggml" if _ggml_file(model_dir(model_id)) else "ct2"
+
+
+def _ggml_file(d: Path):
+    return next(iter(sorted(d.glob("ggml-*.bin"))), None) if d.is_dir() else None
+
+
+def model_file(model_id) -> Path:
+    """What the engine loads: the folder of a ct2 model, the file of a ggml one."""
+    d = model_dir(model_id)
+    if model_kind(model_id) == "ggml":
+        info = catalog_entry(model_id)
+        return d / next(iter(info.files)) if info else _ggml_file(d)
+    return d
+
+
 def is_installed(model_id) -> bool:
     d = model_dir(model_id)
-    if not all((d / f).is_file() for f in REQUIRED_FILES):
-        return False
     info = catalog_entry(model_id)
-    if info:  # a half-copied model.bin must not count as installed
-        return all((d / n).stat().st_size == s for n, (s, _) in info.files.items())
-    return True
+    if info:  # a half-copied model file must not count as installed
+        return all((d / n).is_file() and (d / n).stat().st_size == s for n, (s, _) in info.files.items())
+    return bool(_ggml_file(d)) or all((d / f).is_file() for f in REQUIRED_FILES)
 
 
 def installed_models():
@@ -202,6 +240,8 @@ def download(info: ModelInfo, mirrors=None, progress=None, cancel=None, log=prin
     meter = _Meter(progress, info.size, have)
     last_error = None
     for name_, template in mirrors or MIRRORS:
+        if "{repo}" in template and not info.repo:
+            continue
         meter.source = name_
         try:
             for name, (size, _) in info.files.items():
@@ -278,15 +318,42 @@ def _zip_names(path: Path):
 
 
 def import_file(source: Path):
-    """Install from a .zip or folder: a speech model or the GPU pack, whichever it
-    holds. Returns ("model", id) or ("gpu", None)."""
+    """Install from a .zip, a folder or a whisper.cpp .bin file: a speech model or
+    the GPU pack, whichever it holds. Returns ("model", id) or ("gpu", None)."""
     source = Path(source)
     if source.is_file() and source.suffix.lower() in (".zip", ".whl") \
             and set(GPU_FILES) <= _zip_names(source):
         GPU_DIR.mkdir(parents=True, exist_ok=True)
         _install_gpu_archive(source)
         return "gpu", None
+    if source.is_file() and source.suffix.lower() == ".bin":
+        return "model", _import_ggml(source)
     return "model", import_model(source)
+
+
+def _import_ggml(source: Path, move=False) -> str:
+    """Install a whisper.cpp model file (a catalog one is recognised by its size and hash)."""
+    size = source.stat().st_size
+    info = next((m for m in CATALOG if m.kind == "ggml" and next(iter(m.files.values()))[0] == size), None)
+    if info:
+        name, (_, digest) = next(iter(info.files.items()))
+        if digest and _sha256(source) != digest:
+            raise DownloadError(f"{source.name}: فایل مدل سالم نیست")
+        model_id = info.id
+    else:
+        with open(source, "rb") as f:
+            if f.read(4) != b"lmgg":  # the GGML magic, little-endian
+                raise DownloadError("این فایل، مدل whisper.cpp نیست.")
+        model_id = source.stem
+        name = source.name if source.name.startswith("ggml-") else f"ggml-{source.name}"
+    target = model_dir(model_id)
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True)
+    tmp = target / f"{name}.partial"
+    (shutil.move if move else shutil.copy2)(str(source), tmp)
+    tmp.replace(target / name)
+    return model_id
 
 
 def import_model(source: Path) -> str:
@@ -300,10 +367,16 @@ def import_model(source: Path) -> str:
         if source.is_file() and source.suffix.lower() == ".zip":
             with zipfile.ZipFile(source) as z:
                 z.extractall(staging)
+            ggml = next(iter(sorted(staging.rglob("ggml-*.bin"))), None)
+            if ggml and not any(staging.rglob("model.bin")):
+                return _import_ggml(ggml, move=True)
             root = next((p.parent for p in staging.rglob("model.bin")), None)
         else:
             root = source if (source / "model.bin").exists() else next(
                 (p.parent for p in source.rglob("model.bin")), None)
+            ggml = next(iter(sorted(source.rglob("ggml-*.bin"))), None)
+            if root is None and ggml:
+                return _import_ggml(ggml)
         if root is None or not all((root / f).is_file() for f in REQUIRED_FILES):
             raise DownloadError("در این مسیر، فایل‌های لازم مدل (model.bin و ...) پیدا نشد.")
         # recognise a catalog model by its file sizes; otherwise use the folder name

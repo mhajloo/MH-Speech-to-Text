@@ -97,6 +97,9 @@ def fake_app():
         def switch_model(self, m):
             pass
 
+        def set_device(self, device):
+            self.cfg.device = device
+
         def open_wizard(self, page=None):
             pass
     return Fake()

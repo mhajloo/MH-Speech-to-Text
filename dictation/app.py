@@ -5,7 +5,6 @@ import sys
 import threading
 import time
 import traceback
-from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
@@ -65,9 +64,10 @@ class App(QObject):
         self.load_engine()
 
     def load_engine(self):
+        from .devices import any_model_installed
         from .engine import Engine
         add_cuda_dlls()  # again: the GPU pack may have been downloaded since start-up
-        if not Path(self.cfg.model).is_absolute() and not modelstore.is_installed(self.cfg.model):
+        if not any_model_installed(self.cfg.model):
             self._engine_status.emit("nomodel")
             return
         self._engine_status.emit("loading")
@@ -82,20 +82,29 @@ class App(QObject):
             self.tray.notify("مدل گفتار بارگذاری نشد", "برای جزئیات، تنظیمات ← مدل گفتار را ببینید.")
 
     def engine_status(self) -> dict:
-        from . import sysinfo
         state = self.engine_state
+        target = self.engine.target if self.engine is not None and state == "ready" else None
         if state == "ready":
-            gpu = sysinfo.nvidia_gpu()
-            on_gpu = self.engine is not None and self.engine.device == "cuda"
-            where = f"کارت گرافیک {gpu[0]}" if on_gpu and gpu else "پردازنده (بدون کارت گرافیک؛ کندتر)"
+            where = target.label if target else "پردازنده"
             text = f"فعال و آماده؛ اجرا روی {where}"
+            if target and target.device == "cpu":
+                text += " (کندتر از کارت گرافیک)"
+                gpu = next((t for t, _ in self.engine.failed if t.card), None)
+                if gpu:  # the error itself is in the log
+                    text += f". {gpu.label} اجرا نشد."
         elif state == "loading":
-            text = "در حال بارگذاری مدل… (حدود ۱۵ ثانیه)"
+            text = "در حال بارگذاری مدل… (چند ثانیه)"
         elif state == "nomodel":
             text = "این مدل نصب نیست؛ آن را دانلود کنید یا از فایل اضافه کنید."
         else:
             text = f"بارگذاری نشد: {self.engine.error if self.engine else ''}"
-        return {"state": state, "model": self.cfg.model, "text": text}
+        return {"state": state, "model": target.model if target else self.cfg.model, "text": text}
+
+    def set_device(self, device):
+        """Where to run speech recognition: "auto", "cpu" or "gpu:<card name>"."""
+        if device != self.cfg.device:
+            self.cfg.device = device
+            self.switch_model(self.cfg.model)  # saves the setting and reloads the engine
 
     def switch_model(self, model_id):
         self.cfg.model = model_id
@@ -293,6 +302,7 @@ class App(QObject):
     def open_wizard(self, page=None):
         from .ui.wizard import SetupWizard
         before, gpu_before = self.cfg.model, modelstore.gpu_pack_installed()
+        models_before = set(modelstore.installed_models())
         if self.hotkey:
             self.hotkey.suspended = True
         try:
@@ -301,7 +311,8 @@ class App(QObject):
             if self.hotkey:
                 self.hotkey.suspended = False
         gpu_added = modelstore.gpu_pack_installed() and not gpu_before
-        if self.cfg.model != before or self.engine_state == "nomodel" or gpu_added:
+        models_added = set(modelstore.installed_models()) - models_before
+        if self.cfg.model != before or self.engine_state == "nomodel" or gpu_added or models_added:
             self.switch_model(self.cfg.model)  # reload: new model, or now able to use the GPU
         self.engine_status_changed.emit()
 
@@ -367,6 +378,7 @@ def main():
     if _already_running():
         return
 
+    from .devices import any_model_installed
     from .ui import theme
     from .ui.icons import logo_icon
     from .ui.widgets import combo_text
@@ -383,8 +395,8 @@ def main():
     server.listen(SERVER_NAME)
     server.newConnection.connect(lambda: (server.nextPendingConnection(), app.show_settings()))
 
-    first_run = not cfg.first_run_done or not modelstore.is_installed(cfg.model)
-    if first_run and not SetupWizard(app).exec() and not modelstore.is_installed(cfg.model):
+    first_run = not cfg.first_run_done or not any_model_installed(cfg.model)
+    if first_run and not SetupWizard(app).exec() and not any_model_installed(cfg.model):
         app.quit()
         return
     app.start()

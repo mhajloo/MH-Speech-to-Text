@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 1, 0, 0),
+    prodvers=(1, 1, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'Mohammad Hajloo'),
          StringStruct('FileDescription', 'MH-Speech to Text - Persian dictation'),
-         StringStruct('FileVersion', '1.0.0'),
+         StringStruct('FileVersion', '1.1.0'),
          StringStruct('InternalName', 'MH-Speech to Text'),
          StringStruct('LegalCopyright', 'Copyright (c) 2026 Mohammad Hajloo - www.hajloo.ir'),
          StringStruct('OriginalFilename', 'MH-Speech to Text.exe'),
          StringStruct('ProductName', 'MH-Speech to Text'),
-         StringStruct('ProductVersion', '1.0.0')])
+         StringStruct('ProductVersion', '1.1.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

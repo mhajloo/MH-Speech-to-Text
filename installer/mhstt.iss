@@ -3,7 +3,7 @@
 ; Expects the PyInstaller output in build\dist\MH-Speech to Text.
 
 #define AppName "MH-Speech to Text"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe "MH-Speech to Text.exe"
 
 [Setup]
@@ -54,7 +54,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
 WelcomeExtra=Dictate in Persian in any application: hold a hotkey, speak, and release. Speech recognition runs entirely on your computer and no audio ever leaves it.
-DeleteUserData=Do you also want to remove the downloaded speech model and GPU pack (up to 2.4 GB), your settings and your dictation history?%n%nChoose No if you plan to reinstall, so they do not have to be downloaded again.
+DeleteUserData=Do you also want to remove the downloaded speech models and GPU pack (up to 4 GB), your settings and your dictation history?%n%nChoose No if you plan to reinstall, so they do not have to be downloaded again.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"

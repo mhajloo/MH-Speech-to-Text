@@ -1,9 +1,8 @@
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields
-from pathlib import Path
 
-from .paths import CONFIG_PATH, MODELS_DIR
+from .paths import CONFIG_PATH
 
 
 @dataclass
@@ -13,9 +12,9 @@ class Config:
     record_mode: str = "hold"         # "hold": talk while held; "toggle": press to start, again to stop
     cancel_key: str = "esc"           # discards the current dictation
     # --- speech model ---
-    model: str = "fa-amirmohseni-large-v3"  # folder name under the models dir, or an absolute path
-    device: str = "cuda"              # "cuda" or "cpu"
-    compute_type: str = "int8_float16"  # int8_float16 / float16 (GPU), int8 (CPU)
+    model: str = "fa-amirmohseni-large-v3"  # folder name under the models dir
+    device: str = "auto"              # "auto", "cpu" or "gpu:<card name>" (see devices.py)
+    compute_type: str = "int8_float16"  # CTranslate2 on NVIDIA cards (the CPU always uses int8)
     beam_size: int = 5
     final_beam_size: int = 1          # beam for the piece decoded after release (0 = beam_size)
     fast_context: bool = True         # size the encoder to the audio instead of 30 s (much faster)
@@ -48,6 +47,8 @@ class Config:
         except (OSError, ValueError):
             return cls()  # a broken file must not stop the app from starting
         known = {f.name for f in fields(cls)}
+        if data.get("device") == "cuda":  # 1.0 saved its default; the card is now chosen by name
+            data["device"] = "auto"
         return cls(**{k: v for k, v in data.items() if k in known})
 
     def save(self):
@@ -55,7 +56,3 @@ class Config:
         tmp = CONFIG_PATH.with_suffix(".tmp")
         tmp.write_text(json.dumps(asdict(self), ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, CONFIG_PATH)  # atomic: a crash mid-write can't corrupt the settings
-
-    def model_path(self) -> str:
-        p = Path(self.model)
-        return str(p if p.is_absolute() else MODELS_DIR / self.model)

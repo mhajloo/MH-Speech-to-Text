@@ -6,7 +6,7 @@ from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel,
                                QProgressBar, QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
-from .. import autostart, modelstore, sysinfo
+from .. import autostart, devices, modelstore
 from ..audio import default_input_name, input_devices
 from ..branding import APP_DESCRIPTION, APP_NAME
 from . import theme
@@ -15,6 +15,7 @@ from .theme import c, fa
 from .widgets import Card, KeyCaps, LevelMeter, combo_text, device_label, label, set_msg
 
 STEPS = ["خوش آمدید", "بررسی سیستم", "اجزای گفتار", "میکروفون", "آماده است"]
+LOW_MEMORY_MB = 3000  # the model and its buffers take ≈2.5 GB of graphics memory
 
 
 class _BrandPanel(QWidget):
@@ -78,6 +79,8 @@ class SetupWizard(QDialog):
         self.setFixedSize(780, 540)
         self._cancel = threading.Event()
         self._downloading = False
+        # finding the graphics cards loads Vulkan (about a second): done by the system page
+        threading.Thread(target=devices.cards, daemon=True).start()
 
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -131,7 +134,8 @@ class SetupWizard(QDialog):
                 ("keyboard", "در هر برنامه‌ای", "کلید میان‌بر را نگه دارید، صحبت کنید و رها کنید؛ متن "
                                                 "همان‌جایی نوشته می‌شود که مکان‌نما هست."),
                 ("shield", "آفلاین و خصوصی", "صدای شما از کامپیوترتان خارج نمی‌شود."),
-                ("bolt", "دقیق و سریع", "با مدل فارسی دقیق و بهینه‌شده برای کارت گرافیک NVIDIA.")):
+                ("bolt", "دقیق و سریع", "با مدل فارسی دقیق، روی کارت گرافیک NVIDIA، AMD یا Intel و "
+                                        "بدون آن روی پردازنده.")):
             row = QHBoxLayout()
             ic = QLabel()
             ic.setPixmap(line_icon(icon, c("primary")).pixmap(26, 26))
@@ -148,7 +152,8 @@ class SetupWizard(QDialog):
         return w
 
     def _system(self):
-        w = self._col("بررسی سیستم", "مدل فارسی دقیق برای سرعت خوب به کارت گرافیک NVIDIA نیاز دارد.")
+        w = self._col("بررسی سیستم", "تبدیل گفتار روی کارت گرافیک سریع‌تر است؛ بدون آن، برنامه روی "
+                                     "پردازنده کار می‌کند.")
         self.sys_card = Card()
         w.col.addWidget(self.sys_card)
         w.col.addStretch(1)
@@ -160,16 +165,24 @@ class SetupWizard(QDialog):
             item = card.body.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        gpu = sysinfo.nvidia_gpu()
+        gpu = devices.best_card()
         if gpu:
-            name, mem = gpu
-            card.add(self._status_row("check", "success", f"کارت گرافیک پیدا شد: {name}",
-                                      f"حافظه‌ی گرافیک: {fa(round(mem / 1024, 1))} گیگابایت"))
-        else:
-            card.add(self._status_row(
-                "close", "warning", "کارت گرافیک NVIDIA پیدا نشد",
-                "برنامه روی پردازنده هم کار می‌کند، اما تبدیل متن چند برابر کندتر است و برای "
-                "دیکته‌های طولانی مناسب نیست."))
+            memory = f"حافظه‌ی گرافیک: {fa(f'{gpu.memory_mb / 1024:.1f}'.removesuffix('.0'))} گیگابایت"
+            if gpu.memory_mb < LOW_MEMORY_MB:
+                card.add(self._status_row(
+                    "info", "warning", f"کارت گرافیک پیدا شد: {gpu.name}",
+                    f"{memory}؛ شاید برای مدل فارسی دقیق کافی نباشد. در این صورت برنامه خودکار روی "
+                    "پردازنده کار می‌کند."))
+            else:
+                card.add(self._status_row("check", "success", f"کارت گرافیک پیدا شد: {gpu.name}", memory))
+            return
+        text = ("برنامه روی پردازنده کار می‌کند. این کار کندتر است: بعد از رها کردن کلید، چند ثانیه طول "
+                "می‌کشد تا متن نوشته شود.")
+        integrated = next((g for g in devices.cards() if g.integrated), None)
+        if integrated:
+            text += (f" کارت گرافیک مجتمع ({integrated.name}) را هم می‌توانید بعداً در تنظیمات امتحان "
+                     "کنید؛ در سیستم‌های جدید ممکن است سریع‌تر از پردازنده باشد.")
+        card.add(self._status_row("info", "warning", "کارت گرافیک جداگانه پیدا نشد", text))
 
     def _status_row(self, icon, color, title, text):
         row = QWidget()
@@ -187,15 +200,15 @@ class SetupWizard(QDialog):
         return row
 
     def _model(self):
-        info = modelstore.CATALOG[0]
         w = self._col("اجزای گفتار", "این اجزا یک بار دانلود می‌شوند و بعد از آن برنامه کاملاً آفلاین کار "
                                      "می‌کند.")
-        self.model_card = Card(info.title, f"مدل تبدیل گفتار فارسی · حجم: {modelstore.size_text(info.size)}")
-        self.model_status = label("", "Success")
-        self.model_card.add(self.model_status)
+        self.model_card = Card()  # which model depends on the graphics card: see _refresh_model_page
+        self.model_title = self.model_card.add(label("", "CardTitle"))
+        self.model_text = self.model_card.add(label("", "CardText", wrap=True))
+        self.model_status = self.model_card.add(label("", "Success"))
         w.col.addWidget(self.model_card)
         gpu_size = modelstore.GPU_SOURCES[0][2]
-        self.gpu_card = Card(modelstore.GPU_PACK_TITLE, "برای تبدیل سریع روی کارت گرافیک (کتابخانه‌ی "
+        self.gpu_card = Card(modelstore.GPU_PACK_TITLE, "برای تبدیل سریع روی کارت گرافیک NVIDIA (کتابخانه‌ی "
                                                         f"cuBLAS از NVIDIA) · حجم: {modelstore.size_text(gpu_size)}")
         self.gpu_status = label("", "Success")
         self.gpu_card.add(self.gpu_status)
@@ -212,35 +225,40 @@ class SetupWizard(QDialog):
         self.dl_btn.setObjectName("Primary")
         self.dl_btn.setIcon(line_icon("download", "#ffffff"))
         self.dl_btn.clicked.connect(self._download)
-        imp = QPushButton("از فایل zip…")
+        imp = QPushButton("از فایل…")
         imp.clicked.connect(self._import)
         row.addWidget(self.dl_btn)
         row.addWidget(imp)
         row.addStretch(1)
         w.col.addLayout(row)
-        w.col.addWidget(label("اگر اینترنت کند است، فایل zip این اجزا را از کسی که برنامه را نصب کرده "
-                              "بگیرید و از همین‌جا اضافه کنید.", "Hint", wrap=True))
+        w.col.addWidget(label("اگر اینترنت کند است، فایل این اجزا (zip یا bin) را از کسی که برنامه را نصب "
+                              "کرده بگیرید و از همین‌جا اضافه کنید.", "Hint", wrap=True))
         w.col.addStretch(1)
         return w
 
-    def _gpu_present(self):
-        return sysinfo.nvidia_gpu() is not None
+    def _targets(self):
+        return devices.targets(self.app.cfg.device, self.app.cfg.model)
 
     def _model_ok(self):
-        return modelstore.is_installed(self.app.cfg.model) or modelstore.is_installed(modelstore.DEFAULT_MODEL)
+        """Some installed model can run, even if not the best one for this PC."""
+        return bool(self._targets())
 
     def _refresh_model_page(self):
-        model_ok, gpu = self._model_ok(), self._gpu_present()
-        gpu_ok = modelstore.gpu_pack_installed()
-        set_msg(self.model_status, "نصب شده و آماده است." if model_ok else "", "Success")
-        self.gpu_card.setVisible(gpu)
-        set_msg(self.gpu_status, "نصب شده و آماده است." if gpu_ok else "", "Success")
-        missing = not model_ok or (gpu and not gpu_ok)
+        model_id, pack = devices.requirements(self.app.cfg.device)
+        info = modelstore.catalog_entry(model_id)
+        need = devices.needs(self.app.cfg.device)
+        self.model_title.setText(info.title)
+        self.model_text.setText(f"مدل تبدیل گفتار فارسی · حجم: {modelstore.size_text(info.size)}")
+        set_msg(self.model_status, "" if need["model"] else "نصب شده و آماده است.", "Success")
+        self.gpu_card.setVisible(pack)
+        set_msg(self.gpu_status, "" if need["gpu_pack"] else "نصب شده و آماده است.", "Success")
+        missing = bool(need["model"] or need["gpu_pack"])
         self.bar.setVisible(self._downloading)
         self.dl_btn.setVisible(missing or self._downloading)
         self.dl_btn.setText("لغو دانلود" if self._downloading else "دانلود")
-        if not self._downloading and model_ok and gpu and not gpu_ok and not self.bar_text.text():
-            set_msg(self.bar_text, "بدون شتاب‌دهنده، تبدیل روی پردازنده و چند برابر کندتر انجام می‌شود.",
+        if (not self._downloading and missing and self._model_ok() and not self.bar_text.text()
+                and all(t.device == "cpu" for t in self._targets())):
+            set_msg(self.bar_text, "تا این اجزا دانلود نشوند، تبدیل گفتار روی پردازنده و کندتر انجام می‌شود.",
                     "Warning")
         self._update_nav()
 
@@ -345,21 +363,21 @@ class SetupWizard(QDialog):
         if self._downloading:
             self._cancel.set()
             return
+        need = devices.needs(self.app.cfg.device)
+        model = modelstore.catalog_entry(need["model"]) if need["model"] else None
         self._cancel.clear()
         self._downloading = True
         self.bar.setValue(0)
         set_msg(self.bar_text, "در حال اتصال…")
         self._refresh_model_page()
-        need_gpu = self._gpu_present() and not modelstore.gpu_pack_installed()
-        need_model = not self._model_ok()
 
         def work():
             try:
-                if need_gpu:
+                if need["gpu_pack"]:
                     modelstore.download_gpu_pack(progress=lambda d, t, v, src: self.progress.emit(
                         d, t, v, f"{modelstore.GPU_PACK_TITLE} · {src}"), cancel=self._cancel)
-                if need_model:
-                    modelstore.download(modelstore.CATALOG[0], None, lambda d, t, v, src: self.progress.emit(
+                if model:
+                    modelstore.download(model, None, lambda d, t, v, src: self.progress.emit(
                         d, t, v, f"مدل گفتار · {src}"), self._cancel)
                 self.download_done.emit(None)
             except modelstore.Cancelled:
@@ -392,7 +410,7 @@ class SetupWizard(QDialog):
         self._refresh_model_page()
 
     def _import(self):
-        path, _ = QFileDialog.getOpenFileName(self, "انتخاب فایل", "", "فایل zip (*.zip *.whl)")
+        path, _ = QFileDialog.getOpenFileName(self, "انتخاب فایل", "", "فایل zip یا مدل (*.zip *.whl *.bin)")
         if not path:
             return
         set_msg(self.bar_text, "در حال کپی و بررسی فایل…")

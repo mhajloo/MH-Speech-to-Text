@@ -14,6 +14,12 @@ binaries = collect_dynamic_libs("ctranslate2")
 # onnxruntime imports these C++ runtime DLLs, which otherwise only exist inside the
 # PySide6 folder; at the top level they are found on a PC without the VC++ redistributable
 binaries += [(str(SITE / "PySide6" / n), ".") for n in ("MSVCP140_1.dll", "MSVCP140_2.dll")]
+# whisper.cpp with Vulkan for AMD, Intel and NVIDIA cards (tools/build_whispercpp.py), in its
+# own folder. ggml-vulkan.dll uses the Vulkan loader that graphics drivers install in System32.
+WHISPERCPP = ROOT / "build_cache" / "whispercpp" / "bin"
+if not (WHISPERCPP / "whisper.dll").exists():
+    raise SystemExit("whisper.cpp is not built: run tools/build_whispercpp.py")
+binaries += [(str(p), "whispercpp") for p in sorted(WHISPERCPP.glob("*.dll"))]
 
 datas = [(str(ROOT / "assets"), "assets")]
 datas += collect_data_files("faster_whisper")      # the Silero VAD model
@@ -45,7 +51,8 @@ a = Analysis(
 # cuDNN loader the CTranslate2 wheel carries (never loaded: Whisper doesn't need cuDNN)
 a.binaries = [b for b in a.binaries
               if not b[0].replace("\\", "/").startswith("nvidia/")
-              and not b[0].lower().endswith("cudnn64_9.dll")]
+              and not b[0].lower().endswith("cudnn64_9.dll")
+              and b[0].lower() != "vulkan-1.dll"]  # part of the graphics driver
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,

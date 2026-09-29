@@ -40,7 +40,7 @@ def _compression_ratio(text: str) -> float:
     return len(b) / max(1, len(zlib.compress(b)))
 
 
-def _plausible(text: str, seconds: float) -> bool:
+def plausible(text: str, seconds: float) -> bool:
     # Persian speech runs ≈ 12–18 characters per second
     return _compression_ratio(text) < 2.4 and len(text) < seconds * 40 + 20
 
@@ -91,9 +91,19 @@ class FastDecoder:
             return None
         enc = self._encode(both, self._frames(len(both)))
         text, score, nsp, runaway = self._generate(enc, prompt_text, beam_size, context_text)
-        if not text or runaway or score < -1.0 or not _plausible(text, len(audio) / SR):
+        if not text or runaway or score < -1.0 or not plausible(text, len(audio) / SR):
             return None
         return Result(text, score, nsp, mode="context")
+
+    def warm_up(self):
+        """A first tiny decode, so GPU memory and kernels are set up before the first
+        dictation and a GPU that can't really run (driver, cuBLAS) fails now. Silence
+        makes the model repeat itself up to the length limit (8 s on a T500, 12 s on
+        a laptop CPU), hence the short max_length."""
+        audio = np.zeros(SR, dtype=np.float32)
+        prompt = self.m.get_prompt(self.tok, [], without_timestamps=True)
+        self.m.model.generate(self._encode(audio, self._frames(len(audio))), [prompt],
+                              beam_size=1, max_length=8)
 
     def transcribe(self, audio: np.ndarray, prompt_text=None, beam_size=5, fast=True,
                    context_audio=None, context_text=None) -> Result:
@@ -110,7 +120,7 @@ class FastDecoder:
         if frames < FULL_FRAMES:
             text, score, nsp, runaway = self._generate(self._encode(audio, frames),
                                                         prompt_text, beam_size)
-            if not runaway and score > -1.0 and _plausible(text, len(audio) / SR):
+            if not runaway and score > -1.0 and plausible(text, len(audio) / SR):
                 return Result(text, score, nsp)
         text, score, nsp, _ = self._generate(self._encode(audio, FULL_FRAMES), prompt_text, beam_size)
         return Result(text, score, nsp, mode="full")

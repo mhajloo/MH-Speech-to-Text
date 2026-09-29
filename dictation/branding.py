@@ -3,7 +3,7 @@
 APP_NAME = "MH-Speech to Text"
 APP_TAGLINE = "تبدیل گفتار فارسی به متن"
 APP_DESCRIPTION = "دیکته‌ی فارسی در هر برنامه‌ای؛ آفلاین و روی سیستم خودتان"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_ID = "Hajloo.MHSpeechToText"   # Windows AppUserModelID (taskbar, notifications)
 APP_DIR_NAME = "MH-Speech to Text"  # folder name under %APPDATA% / %LOCALAPPDATA%
 

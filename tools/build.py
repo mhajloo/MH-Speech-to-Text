@@ -1,5 +1,5 @@
 """Build the Windows installer in one go:
-icons → PyInstaller app folder → NOTICE.txt → (signing) → Inno Setup installer.
+icons → whisper.cpp → PyInstaller app folder → NOTICE.txt → (signing) → Inno Setup installer.
 
 Usage: .venv/Scripts/python tools/build.py [--skip-app]
 Output: build/installer/MH-Speech-to-Text-Setup-<version>.exe
@@ -39,6 +39,7 @@ def main():
     sign = signing_configured()
     run(PY, "tools/make_assets.py")
     if "--skip-app" not in sys.argv:
+        run(PY, "tools/build_whispercpp.py")  # once: kept in build_cache/
         shutil.rmtree(ROOT / "build" / "dist", ignore_errors=True)
         shutil.rmtree(ROOT / "build" / "work", ignore_errors=True)
         run(PY.with_name("pyinstaller.exe"), "installer/mhstt.spec", "--noconfirm",
