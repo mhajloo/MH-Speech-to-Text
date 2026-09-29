@@ -15,10 +15,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = Path(sys.executable)
-# per-user install (winget) or machine-wide (Chocolatey on GitHub Actions)
-ISCC = next((p for p in (Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
-                         Path(os.environ.get("ProgramFiles(x86)", "")) / "Inno Setup 6" / "ISCC.exe")
-             if p.exists()), Path("ISCC.exe"))
 APP_EXE = ROOT / "build" / "dist" / "MH-Speech to Text" / "MH-Speech to Text.exe"
 SIGN_PS1 = ROOT / "tools" / "sign.ps1"
 POWERSHELL = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
@@ -33,9 +29,22 @@ def signing_configured() -> bool:
     return bool(os.environ.get("MHSTT_SIGN_THUMBPRINT") or os.environ.get("MHSTT_SIGN_PFX"))
 
 
+def find_iscc() -> Path:
+    """Inno Setup's compiler, installed per user (winget), for all users (Chocolatey
+    on GitHub Actions) or anywhere on PATH (Chocolatey puts it there too)."""
+    dirs = [Path(os.environ.get("LOCALAPPDATA", "")) / "Programs",
+            Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
+            Path(os.environ.get("ProgramFiles", r"C:\Program Files"))]
+    candidates = [d / "Inno Setup 6" / "ISCC.exe" for d in dirs]
+    found = next((p for p in candidates if p.exists()), None) or shutil.which("ISCC")
+    if not found:
+        sys.exit("Inno Setup 6 not found; looked in:\n  " + "\n  ".join(map(str, candidates))
+                 + "\n  and on PATH")
+    return Path(found)
+
+
 def main():
-    if not ISCC.exists():
-        sys.exit(f"Inno Setup not found at {ISCC}")
+    iscc_exe = find_iscc()
     sign = signing_configured()
     run(PY, "tools/make_assets.py")
     if "--skip-app" not in sys.argv:
@@ -45,7 +54,7 @@ def main():
         run(PY.with_name("pyinstaller.exe"), "installer/mhstt.spec", "--noconfirm",
             "--distpath", "build/dist", "--workpath", "build/work", "--log-level", "WARN")
     run(PY, "tools/make_notice.py")
-    iscc = [ISCC, "/Q"]
+    iscc = [iscc_exe, "/Q"]
     if sign:
         run(*POWERSHELL, SIGN_PS1, APP_EXE)
         # Inno Setup signs the installer and the uninstaller with this command
