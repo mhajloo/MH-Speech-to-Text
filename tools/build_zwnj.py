@@ -134,7 +134,7 @@ def main():
             add(stem + "ه" + Z + end, check_usage=False)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(sorted(forms)) + "\n", encoding="utf-8")
+    OUT.write_text("\n".join(sorted(forms)) + "\n", encoding="utf-8", newline="\n")
     print(f"{len(forms)} forms -> {OUT.relative_to(ROOT)} "
           f"(Common Voice types: {len(counts)}, Hazm lemmas: {len(tagged)}, verbs: {len(verbs)})")
 

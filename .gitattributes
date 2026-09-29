@@ -1,3 +1,7 @@
 # LF line endings everywhere, also in Windows checkouts (Python, Inno Setup and
 # PowerShell all read them); binary files are detected automatically
 * text=auto eol=lf
+
+# generated on Windows with CRLF (tools/make_notice.py), which older Notepad
+# versions need; check it out the same way so a rebuild changes nothing
+assets/NOTICE.txt text eol=crlf

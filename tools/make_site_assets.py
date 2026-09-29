@@ -46,7 +46,7 @@ def fonts():
 
 def logos():
     from dictation.ui.icons import LOGO_SVG, svg_pixmap
-    (SITE / "img" / "logo.svg").write_text(LOGO_SVG.strip(), encoding="utf-8")
+    (SITE / "img" / "logo.svg").write_text(LOGO_SVG.strip() + "\n", encoding="utf-8", newline="\n")
     pm = svg_pixmap(LOGO_SVG, 90)  # 180 px at the 2x scale factor
     qimage_to_pil(pm.toImage()).save(SITE / "img" / "apple-touch-icon.png")
 
