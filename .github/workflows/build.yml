@@ -14,9 +14,9 @@ jobs:
   build:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -45,10 +45,14 @@ jobs:
 
       - name: Build app and installer
         run: python tools/build.py
+        env:
+          # MSBuild fails on paths over 260 characters, and the checkout folder
+          # (D:\a\MH-Speech-to-Text\MH-Speech-to-Text) is too deep for whisper.cpp's build
+          WHISPERCPP_BUILD_DIR: ${{ runner.temp }}\wcpp
 
       - name: Upload unsigned installer
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installer
           path: build/installer/*.exe

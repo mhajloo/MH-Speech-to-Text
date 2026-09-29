@@ -2,11 +2,14 @@
 
 Output: build_cache/whispercpp/bin, the DLLs the app loads (see
 dictation/whispercpp.py). whisper-quantize.exe and whisper-cli.exe, for making
-and testing models (not shipped), stay in build_cache/whispercpp/build/bin/Release.
+and testing models (not shipped), stay in the build folder's bin/Release.
 
 Needs Visual Studio 2022 (Build Tools with C++), CMake and the Vulkan SDK
 (VULKAN_SDK set, or installed in C:\\VulkanSDK). GitHub Actions has the first
 two; the workflow installs the SDK.
+
+The build folder is build_cache/whispercpp/build, or WHISPERCPP_BUILD_DIR when
+set: its path must stay short (see MAX_BUILD_PATH).
 
 Usage: .venv/Scripts/python tools/build_whispercpp.py [--force]
 """
@@ -20,8 +23,12 @@ VERSION = "v1.9.4"
 COMMIT = "927cfce34f31707e17f2bff35c349632fb9e2c3a"  # what VERSION pointed to when tested
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "build_cache" / "whisper.cpp"
-BUILD = ROOT / "build_cache" / "whispercpp" / "build"
+BUILD = Path(os.environ.get("WHISPERCPP_BUILD_DIR") or ROOT / "build_cache" / "whispercpp" / "build")
 BIN = ROOT / "build_cache" / "whispercpp" / "bin"
+# ggml compiles its Vulkan shader generator ~190 characters deep inside the build
+# folder, and MSBuild fails past Windows' 260-character path limit (seen on GitHub
+# Actions, whose checkout path is 22 characters longer than this project's)
+MAX_BUILD_PATH = 50
 
 CMAKE_OPTIONS = [
     "-DBUILD_SHARED_LIBS=ON",
@@ -77,6 +84,10 @@ def main():
     if (BIN / "whisper.dll").exists() and "--force" not in sys.argv:
         print(f"whisper.cpp already built in {BIN.relative_to(ROOT)} (--force rebuilds)")
         return
+    if len(str(BUILD)) > MAX_BUILD_PATH:
+        raise SystemExit(f"The build folder's path is too long for MSBuild ({len(str(BUILD))} > "
+                         f"{MAX_BUILD_PATH} characters): {BUILD}\n"
+                         "Set WHISPERCPP_BUILD_DIR to a short folder, for example C:\\wcpp.")
     if not SRC.exists():
         run(["git", "clone", "--depth", "1", "--branch", VERSION,
              "https://github.com/ggml-org/whisper.cpp", SRC])
@@ -93,6 +104,8 @@ def main():
     shutil.rmtree(BIN, ignore_errors=True)
     BIN.mkdir(parents=True)
     dlls = sorted(out.glob("whisper.dll")) + sorted(out.glob("ggml*.dll"))
+    if not {"whisper.dll", "ggml-vulkan.dll"} <= {d.name for d in dlls}:
+        raise SystemExit(f"whisper.dll or ggml-vulkan.dll is missing from {out}")
     for dll in dlls:
         shutil.copy2(dll, BIN / dll.name)
     total = sum(f.stat().st_size for f in BIN.iterdir())
