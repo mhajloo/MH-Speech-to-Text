@@ -1,0 +1,3 @@
+# LF line endings everywhere, also in Windows checkouts (Python, Inno Setup and
+# PowerShell all read them); binary files are detected automatically
+* text=auto eol=lf

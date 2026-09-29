@@ -1,0 +1,43 @@
+# Exact versions of every package the build installs, direct and indirect, as tested
+# for the released installer. Used with: pip install -r requirements.txt -r requirements-dev.txt -c constraints.txt
+# (refresh after upgrading: .venv/Scripts/python -m pip freeze)
+altgraph==0.17.5
+anyio==4.15.1
+av==18.1.0
+certifi==2026.7.22
+cffi==2.1.1
+click==8.5.0
+colorama==0.4.6
+ctranslate2==4.8.2
+faster-whisper==1.2.1
+filelock==4.0.4
+flatbuffers==25.12.19
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.6.0
+httpcore==1.0.9
+httpx==0.28.1
+huggingface_hub==1.33.0
+idna==3.20
+jiwer==4.0.0
+numpy==2.5.3
+onnxruntime==1.30.0
+packaging==26.3
+pefile==2024.8.26
+pillow==12.3.0
+protobuf==7.36.2
+pycparser==3.0
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.7
+PySide6_Essentials==6.11.2
+pywin32==312
+pywin32-ctypes==0.2.3
+PyYAML==6.0.3
+RapidFuzz==3.14.6
+setuptools==84.0.0
+shiboken6==6.11.2
+six==1.17.0
+sounddevice==0.5.6
+tokenizers==0.23.2
+tqdm==4.70.1
+typing_extensions==4.16.0

@@ -1,0 +1,51 @@
+# Builds the Windows installer from source on GitHub's servers, so every released
+# binary can be traced back to this repository (required for SignPath code signing).
+name: Build installer
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt -c constraints.txt
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build app and installer
+        run: python tools/build.py
+
+      - name: Upload unsigned installer
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: build/installer/*.exe
+          if-no-files-found: error
+
+      # After SignPath Foundation approves the project, sign the uploaded artifact:
+      # - uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: <from SignPath>
+      #     project-slug: MH-Speech-to-Text
+      #     signing-policy-slug: release-signing
+      #     github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      #     wait-for-completion: true
+      #     output-artifact-directory: build/signed

@@ -1,0 +1,25 @@
+# environments
+.venv/
+.venv-convert/
+__pycache__/
+*.pyc
+
+# large or generated files
+models/
+gpu/
+build/
+build_cache/
+bench_results/
+*.partial/
+models_download.log
+
+# personal data: never publish voice recordings, dictated text or settings
+samples/
+testaudio/
+history.jsonl
+config.json
+dictation.log
+app.log
+
+# local tooling
+.claude/

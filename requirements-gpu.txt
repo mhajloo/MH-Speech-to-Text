@@ -1,0 +1,4 @@
+# Only for running from source on an NVIDIA GPU. The installed app downloads these
+# two cuBLAS DLLs itself on first run (see dictation/modelstore.py), so the build
+# does not need this package.
+nvidia-cublas-cu12==12.9.2.10

@@ -1,0 +1,5 @@
+# tools/make_site_assets.py: web fonts (WOFF2) and images for the download page in website/
+# (not part of the app; the installer build excludes them)
+fonttools==4.66.0
+brotli==1.2.0
+pillow==12.3.0
