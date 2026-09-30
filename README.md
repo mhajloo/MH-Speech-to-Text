@@ -66,7 +66,7 @@ python -m venv .venv
 | `tools/build_whispercpp.py` | ساخت whisper.cpp با Vulkan برای کارت‌های گرافیک AMD، Intel و NVIDIA |
 | `tools/convert_ggml.py` | تبدیل مدل Hugging Face به قالب whisper.cpp (سپس `whisper-quantize` با q8_0) |
 | `installer/` | تنظیمات PyInstaller و Inno Setup |
-| `website/` | صفحه‌ی دانلود برنامه؛ تصویرها و قلم‌هایش با `tools/make_site_assets.py` ساخته می‌شوند (نیازمندی‌ها: `requirements-site.txt`) |
+| `website/` | صفحه‌ی دانلود برنامه؛ تصویرها و قلم‌هایش با `tools/make_site_assets.py` ساخته می‌شوند (نیازمندی‌ها: `requirements-site.txt`) و ویدیوی نمایشی‌اش با `tools/make_demo_video.py` |
 
 ## مجوز
 

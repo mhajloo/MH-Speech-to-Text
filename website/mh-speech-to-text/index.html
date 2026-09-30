@@ -129,7 +129,7 @@ header {
   font-weight: 500; background: var(--surface); border: 1px solid var(--border); color: var(--muted); box-shadow: var(--shadow);
 }
 .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #1FAF6A; box-shadow: 0 0 0 4px rgba(31, 175, 106, .15); }
-.hero h1 { font-size: clamp(34px, 5vw, 56px); margin-block: 20px 16px; letter-spacing: 0; }
+.hero h1 { font-size: clamp(30px, 4.2vw, 48px); margin-block: 20px 16px; letter-spacing: 0; }
 [data-ui="en"] .hero h1 { letter-spacing: -0.02em; }
 .hero p.lead { font-size: 19px; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-block-start: 30px; }
@@ -212,10 +212,17 @@ kbd {
 .feature h3 { font-size: 19px; margin-block-end: 6px; }
 .feature p { color: var(--muted); font-size: 16px; }
 
-/* stats band */
-.band { background: var(--grad); color: #fff; border-radius: 28px; padding: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; box-shadow: 0 24px 60px rgba(108, 77, 255, .3); }
-.band b { display: block; font-size: 38px; line-height: 1.3; }
-.band span { opacity: .92; }
+/* stats */
+.band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.stat { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px 18px; box-shadow: var(--shadow); }
+.stat-ic { flex: none; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--grad); color: #fff; }
+.stat-ic svg { width: 22px; height: 22px; }
+.stat-txt b { display: block; font-size: 20px; line-height: 1.45; }
+.stat-txt span { display: block; font-size: 14px; line-height: 1.6; color: var(--muted); }
+
+/* demo video */
+.video { max-width: 980px; margin: 36px auto 0; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg); background: #0E0C1A; }
+.video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
 
 /* gallery */
 .shots { display: grid; grid-template-columns: 1.25fr 1fr; gap: 22px; margin-block-start: 40px; align-items: start; }
@@ -290,7 +297,6 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
   .steps, .features, .band { grid-template-columns: 1fr; }
   .facts { grid-template-columns: 1fr 1fr 1fr; }
   .card { padding: 22px; }
-  .band { padding: 28px; }
   .btn { width: 100%; }
   .nav-actions .hide-sm { display: none; }
   .win-body { min-height: 250px; font-size: 16px; }
@@ -345,11 +351,11 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
     <div>
       <span class="badge"><span class="dot"></span><span class="t-fa">رایگان و متن‌باز · نسخه‌ی ۱.۱.۰</span><span class="t-en" lang="en">Free &amp; open source · v1.1.0</span></span>
       <h1>
-        <span class="t-fa">دیکته‌ی فارسی،<br><span class="grad-text">در هر برنامه‌ای</span></span>
-        <span class="t-en" lang="en">Persian dictation,<br><span class="grad-text">in any app</span></span>
+        <span class="t-fa">نرم‌افزار پیشرفته‌ی<br><span class="grad-text">تبدیل گفتار به متن فارسی</span></span>
+        <span class="t-en" lang="en">Advanced Persian<br><span class="grad-text">speech-to-text software</span></span>
       </h1>
-      <p class="lead t-fa">کلید <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> را نگه دارید، صحبت کنید و رها کنید. متن همان‌جایی نوشته می‌شود که مکان‌نما هست: در <bdi>Word</bdi>، مرورگر، تلگرام یا هر برنامه‌ی دیگری. همه‌چیز روی کامپیوتر خودتان انجام می‌شود.</p>
-      <p class="lead t-en" lang="en">Hold <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi>, speak Persian and release. Your words are typed wherever the cursor is: Word, your browser, Telegram or any other app. Everything runs on your own computer.</p>
+      <p class="lead t-fa">کلید میان‌بر دلخواهتان (پیش‌فرض <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi>) را نگه دارید و صحبت کنید، یا یک بار بزنید تا برنامه گوش کند و بار دوم تا متن را بنویسد. متن همان‌جایی نوشته می‌شود که مکان‌نما هست: در <bdi>Word</bdi>، مرورگر، تلگرام یا هر برنامه‌ی دیگری. همه‌چیز روی کامپیوتر خودتان انجام می‌شود.</p>
+      <p class="lead t-en" lang="en">Hold your hotkey (<bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> by default, or any combination you choose) and speak, or press it once to start listening and again to write the text. Your words appear wherever the cursor is: Word, your browser, Telegram or any other app. Everything runs on your own computer.</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://hajloo.ir/downloads/MH-Speech-to-Text-Setup.exe" download>
           <svg><use href="#i-windows"/></svg><span class="t-fa">دانلود برای ویندوز</span><span class="t-en" lang="en">Download for Windows</span>
@@ -388,9 +394,9 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
     <div class="steps">
       <div class="step">
         <div class="num"><span class="t-fa">۱</span><span class="t-en">1</span></div>
-        <h3><span class="t-fa">نگه دارید</span><span class="t-en" lang="en">Hold</span></h3>
-        <p class="t-fa">مکان‌نما را هر جا که می‌خواهید بنویسید بگذارید و <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> را نگه دارید.</p>
-        <p class="t-en" lang="en">Put the cursor wherever you want to write and hold <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi>.</p>
+        <h3><span class="t-fa">شروع کنید</span><span class="t-en" lang="en">Start</span></h3>
+        <p class="t-fa">مکان‌نما را هر جا که می‌خواهید بنویسید بگذارید و کلید میان‌بر را نگه دارید، یا یک بار بزنید. کلید پیش‌فرض <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> است و در تنظیمات هر ترکیبی را می‌توانید انتخاب کنید.</p>
+        <p class="t-en" lang="en">Put the cursor wherever you want to write, then hold your hotkey or press it once. It is <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> by default, and you can pick any combination in Settings.</p>
       </div>
       <div class="step">
         <div class="num"><span class="t-fa">۲</span><span class="t-en">2</span></div>
@@ -400,10 +406,26 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
       </div>
       <div class="step">
         <div class="num"><span class="t-fa">۳</span><span class="t-en">3</span></div>
-        <h3><span class="t-fa">رها کنید</span><span class="t-en" lang="en">Release</span></h3>
-        <p class="t-fa">متن در همان جای مکان‌نما نوشته می‌شود، معمولاً کمتر از دو ثانیه بعد.</p>
-        <p class="t-en" lang="en">The text appears at the cursor, usually within two seconds.</p>
+        <h3><span class="t-fa">تمام کنید</span><span class="t-en" lang="en">Finish</span></h3>
+        <p class="t-fa">کلید را رها کنید، یا اگر یک بار زده بودید دوباره بزنید. متن همان‌جای مکان‌نما نوشته می‌شود، معمولاً کمتر از دو ثانیه بعد.</p>
+        <p class="t-en" lang="en">Release the key, or press it again if you pressed it once. The text appears at the cursor, usually within two seconds.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" style="padding-block-start: 0">
+  <div class="wrap">
+    <div class="center">
+      <p class="eyebrow"><span class="t-fa">نمایش کوتاه</span><span class="t-en" lang="en">Short demo</span></p>
+      <h2><span class="t-fa">ببینید چطور کار می‌کند</span><span class="t-en" lang="en">See it in action</span></h2>
+      <p class="lead t-fa">دیکته در <bdi>Word</bdi> با نگه داشتن کلید، و در <bdi>VS Code</bdi> با یک بار زدن آن.</p>
+      <p class="lead t-en" lang="en">Dictating into Word by holding the hotkey, and into VS Code by pressing it once.</p>
+    </div>
+    <div class="video">
+      <video controls preload="none" playsinline poster="img/demo-poster.webp" width="1920" height="1080" aria-label="MH-Speech to Text demo: dictating Persian into Word and VS Code">
+        <source src="media/demo.mp4" type="video/mp4">
+      </video>
     </div>
   </div>
 </section>
@@ -412,7 +434,7 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
   <div class="wrap">
     <div class="center">
       <p class="eyebrow"><span class="t-fa">ویژگی‌ها</span><span class="t-en" lang="en">Features</span></p>
-      <h2><span class="t-fa">ساخته‌شده برای فارسی</span><span class="t-en" lang="en">Built for Persian</span></h2>
+      <h2><span class="t-fa">ساخته‌شده برای زبان فارسی</span><span class="t-en" lang="en">Built for the Persian language</span></h2>
       <p class="lead t-fa">نه یک ابزار عمومی با پشتیبانی نصفه‌نیمه از فارسی؛ از مدل گفتار تا املا و نیم‌فاصله، همه‌چیز برای فارسی تنظیم شده است.</p>
       <p class="lead t-en" lang="en">Not a generic tool with partial Persian support: from the speech model to spelling and half-spaces, everything is tuned for Persian.</p>
     </div>
@@ -457,12 +479,12 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
   </div>
 </section>
 
-<section style="padding-block: 20px 84px">
+<section style="padding-block: 8px 72px">
   <div class="wrap">
     <div class="band">
-      <div><b class="t-fa">کمتر از ۲ ثانیه</b><b class="t-en" lang="en">&lt; 2 seconds</b><span class="t-fa">انتظار بعد از رها کردن کلید، روی کارت گرافیک جداگانه</span><span class="t-en" lang="en">from releasing the key to text, on a dedicated GPU</span></div>
-      <div><b class="t-fa">۰ بایت</b><b class="t-en" lang="en">0 bytes</b><span class="t-fa">صدا یا متنی که به اینترنت فرستاده می‌شود</span><span class="t-en" lang="en">of audio or text sent over the internet</span></div>
-      <div><b>MIT</b><span class="t-fa">کاملاً رایگان و متن‌باز</span><span class="t-en" lang="en">free and open source</span></div>
+      <div class="stat"><span class="stat-ic"><svg><use href="#i-bolt"/></svg></span><div class="stat-txt"><b class="t-fa">کمتر از ۲ ثانیه</b><b class="t-en" lang="en">&lt; 2 seconds</b><span class="t-fa">انتظار پس از پایان صحبت، روی کارت گرافیک جداگانه</span><span class="t-en" lang="en">wait after you stop speaking, on a dedicated GPU</span></div></div>
+      <div class="stat"><span class="stat-ic"><svg><use href="#i-shield"/></svg></span><div class="stat-txt"><b class="t-fa">۰ بایت</b><b class="t-en" lang="en">0 bytes</b><span class="t-fa">صدا یا متنی که به اینترنت فرستاده می‌شود</span><span class="t-en" lang="en">of audio or text sent over the internet</span></div></div>
+      <div class="stat"><span class="stat-ic"><svg><use href="#i-github"/></svg></span><div class="stat-txt"><b>MIT</b><span class="t-fa">کاملاً رایگان و متن‌باز</span><span class="t-en" lang="en">free and open source</span></div></div>
     </div>
   </div>
 </section>
@@ -542,12 +564,12 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
         <ol class="how t-fa">
           <li><span>فایل نصب را اجرا کنید. برنامه مثل نرم‌افزارهای دیگر در <bdi>Program Files</bdi> نصب می‌شود.</span></li>
           <li><span>در اولین اجرا، مدل گفتار فارسی مناسب سیستم شما (حدود ۱.۶ گیگابایت) و اگر کارت گرافیک <bdi>NVIDIA</bdi> دارید، شتاب‌دهنده‌ی آن یک بار دانلود می‌شود. بعد از آن برنامه کاملاً آفلاین کار می‌کند.</span></li>
-          <li><span>از این به بعد، در هر برنامه‌ای <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> را نگه دارید و صحبت کنید.</span></li>
+          <li><span>از این به بعد، در هر برنامه‌ای کلید میان‌بر (پیش‌فرض <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi>) را نگه دارید یا یک بار بزنید و صحبت کنید. کلید و شیوه‌ی ضبط را در تنظیمات می‌توانید عوض کنید.</span></li>
         </ol>
         <ol class="how t-en" lang="en">
           <li><span>Run the installer. Like other programs, the app is installed in Program Files.</span></li>
           <li><span>On first run, the Persian speech model for your system (about 1.6 GB) and, if you have an NVIDIA graphics card, its accelerator are downloaded once. After that the app works fully offline.</span></li>
-          <li><span>From then on, hold <bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> in any app and speak.</span></li>
+          <li><span>From then on, in any app, hold your hotkey (<bdi class="keys" dir="ltr"><kbd>Ctrl</kbd>+<kbd>Q</kbd></bdi> by default) or press it once, and speak. You can change the key and the recording mode in Settings.</span></li>
         </ol>
         <p class="note t-fa">اگر ویندوز پیغام «<bdi>Windows protected your PC</bdi>» نشان داد، روی <bdi>More info</bdi> و بعد <bdi>Run anyway</bdi> بزنید. این پیغام برای برنامه‌های تازه‌منتشرشده عادی است.</p>
         <p class="note t-en" lang="en">If Windows shows “Windows protected your PC”, click More info and then Run anyway. This is normal for newly released programs.</p>
@@ -628,17 +650,23 @@ footer { border-top: 1px solid var(--border); padding-block: 34px; color: var(--
       </div>
     </div>
     <div class="card" style="margin-block-start: 22px">
-      <h4><span class="t-fa">سپاس</span><span class="t-en" lang="en">Credits</span></h4>
+      <h4><span class="t-fa">مجوزها</span><span class="t-en" lang="en">Licenses</span></h4>
       <ul class="req t-fa">
-        <li>مدل گفتار: <bdi>Whisper</bdi> از <bdi>OpenAI</bdi> و نسخه‌ی فارسی آن از <bdi>AmirMohseni</bdi></li>
-        <li>موتور تبدیل: <bdi>faster-whisper</bdi>، <bdi>CTranslate2</bdi> و <bdi>whisper.cpp</bdi>؛ رابط کاربری: <bdi>Qt</bdi></li>
-        <li>قلم وزیرمتن، طراحی زنده‌یاد صابر راستی‌کردار</li>
+        <li>برنامه: <bdi>MH-Speech to Text</bdi>، مجوز <bdi>MIT</bdi></li>
+        <li>مدل گفتار: <bdi>Whisper</bdi> از <bdi>OpenAI</bdi> (<bdi>MIT</bdi>) و نسخه‌ی فارسی آن از <bdi>AmirMohseni</bdi> (<bdi>Apache-2.0</bdi>)</li>
+        <li>موتور تبدیل: <bdi>faster-whisper</bdi>، <bdi>CTranslate2</bdi> و <bdi>whisper.cpp</bdi> (<bdi>MIT</bdi>)</li>
+        <li>رابط کاربری: <bdi>Qt</bdi> و <bdi>PySide6</bdi> (<bdi>LGPL-3.0</bdi>)</li>
+        <li>قلم وزیرمتن، طراحی زنده‌یاد صابر راستی‌کردار (<bdi>OFL-1.1</bdi>)</li>
       </ul>
       <ul class="req t-en" lang="en">
-        <li>Speech model: Whisper by OpenAI, Persian fine-tune by AmirMohseni</li>
-        <li>Engines: faster-whisper, CTranslate2 and whisper.cpp; interface: Qt</li>
-        <li>Vazirmatn font, designed by the late Saber Rastikerdar</li>
+        <li>App: MH-Speech to Text, MIT License</li>
+        <li>Speech model: Whisper by OpenAI (MIT), Persian fine-tune by AmirMohseni (Apache-2.0)</li>
+        <li>Engines: faster-whisper, CTranslate2 and whisper.cpp (MIT)</li>
+        <li>Interface: Qt and PySide6 (LGPL-3.0)</li>
+        <li>Vazirmatn font, designed by the late Saber Rastikerdar (OFL-1.1)</li>
       </ul>
+      <p class="t-fa" style="margin-block-start: 12px; font-size: 15px"><a href="https://github.com/mhajloo/MH-Speech-to-Text/blob/main/assets/NOTICE.txt">متن کامل مجوزها</a></p>
+      <p class="t-en" lang="en" style="margin-block-start: 12px; font-size: 15px"><a href="https://github.com/mhajloo/MH-Speech-to-Text/blob/main/assets/NOTICE.txt">Full license texts</a></p>
     </div>
   </div>
 </section>
