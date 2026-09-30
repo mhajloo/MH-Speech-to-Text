@@ -51,7 +51,9 @@ def main():
         run(PY, "tools/build_whispercpp.py")  # once: kept in build_cache/
         shutil.rmtree(ROOT / "build" / "dist", ignore_errors=True)
         shutil.rmtree(ROOT / "build" / "work", ignore_errors=True)
-        run(PY.with_name("pyinstaller.exe"), "installer/mhstt.spec", "--noconfirm",
+        # as a module: pyinstaller.exe sits next to python.exe only in a venv, not in a
+        # plain Python install such as GitHub Actions' (there it is in Scripts\)
+        run(PY, "-m", "PyInstaller", "installer/mhstt.spec", "--noconfirm",
             "--distpath", "build/dist", "--workpath", "build/work", "--log-level", "WARN")
     run(PY, "tools/make_notice.py")
     iscc = [iscc_exe, "/Q"]
