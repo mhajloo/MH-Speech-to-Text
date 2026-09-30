@@ -6,9 +6,11 @@ Everything is drawn with Qt (the recording bar is the app's own widget, so the
 video matches the real app) and encoded with PyAV as H.264 + AAC. Word and
 VS Code are simplified look-alikes, drawn without their logos.
 
-Usage: .venv/Scripts/python tools/make_demo_video.py [--frames 5,10.4,...] [--out DIR]
+Usage: .venv/Scripts/python tools/make_demo_video.py [--story] [--frames 5,10.4,...] [--out DIR]
+  --story   the same demo as a vertical 1080x1920 Instagram story
   --frames  only save PNG stills at these times (seconds), for checking the design
-Output: website/mh-speech-to-text/media/demo.mp4 and img/demo-poster.webp
+Output: website/mh-speech-to-text/media/demo.mp4 and img/demo-poster.webp,
+or build/promo/instagram-story.mp4 with --story
 """
 import argparse
 import math
@@ -47,6 +49,24 @@ TAP = 0.22                      # how long a "press once" keeps the keys down
 WORD_TEXT_FA = ("جلسه‌ی فردا ساعت ده صبح برگزار می‌شود؛ لطفاً گزارش‌ها را تا امشب بفرستید "
                 "تا پیش از جلسه مرورشان کنم.")
 CODE_TEXT_FA = "این تابع فهرست اعضا را از پایگاه داده می‌خواند و بر اساس تاریخ عضویت مرتب می‌کند"
+
+# (caption, subtitle) for: Word while held, Word after release, VS Code after the
+# first press, VS Code after the second. The site's video is written; the story
+# is colloquial, as Instagram is.
+CAPTIONS = (("کلید میان‌بر را نگه دارید و صحبت کنید", "کلید دلخواه شما؛ پیش‌فرض Ctrl + Q"),
+            ("رها کنید؛ متن همان‌جا نوشته می‌شود", None),
+            ("یا یک بار بزنید و صحبت کنید", None),
+            ("دوباره بزنید؛ متن در هر برنامه‌ای نوشته می‌شود", None))
+STORY_CAPTIONS = (("کلید میان‌بر رو نگه دارید و حرف بزنید", "کلید دلخواه شما؛ پیش‌فرض Ctrl + Q"),
+                  ("رها کنید؛ متن همون‌جا نوشته میشه", None),
+                  ("یا یه بار بزنید و حرف بزنید", None),
+                  ("دوباره بزنید؛ تو هر برنامه‌ای کار می‌کنه", None))
+
+# the vertical story: 1080x1920, a crop of the window scaled up for a phone,
+# key content kept away from the top and bottom, where Instagram draws its UI
+SW, SH = 1080, 1920
+STORY_CARD = QRectF(40, 650, 1000, 760)
+CROP_WORD_X, CROP_CODE_X, CROP_Y, CROP_W = 460, 515, 150, 1000
 
 # window placement on the 1920x1080 "screen"
 WIN = QRectF(180, 150, 1560, 870)
@@ -554,7 +574,7 @@ class Demo:
         self._key(p, QRectF(kx + 146, ky, 62, 62), "Q", pressed)
         p.restore()
 
-    def _key(self, p, r, label, pressed):
+    def _key(self, p, r, label, pressed, px=24):
         down = 4 * pressed
         r = r.translated(0, down)
         if pressed > 0.01:
@@ -574,7 +594,7 @@ class Demo:
             g.setColorAt(1, QColor("#F1EFF9"))
         round_rect(p, r, 14, g, QPen(QColor("#D9D5EC"), 1.2))
         p.setPen(QColor("#FFFFFF") if pressed > 0.5 else QColor("#17152A"))
-        p.setFont(font(self.ui, 24, 600))
+        p.setFont(font(self.ui, px, 600))
         p.drawText(r, Qt.AlignCenter, label)
 
     def _window(self, p, img, t_in, t_out, t, from_x=0, to_x=0):
@@ -591,7 +611,7 @@ class Demo:
         # the window's own rectangles are in image coordinates: offset them by the image origin
         return QPointF(x, y), k_in * (1 - k_out)
 
-    def _pill(self, p, t, press, release, text_at, subtitle, words, levels, frame):
+    def _pill(self, p, t, press, release, text_at, subtitle, words, levels, frame, cx, bottom, scale):
         """Recording bar: listening from press to release, busy until text_at, then done."""
         fade_in = span(t, press, press + 0.14)
         fade_out = 1 - span(t, text_at + 1.5, text_at + 1.72)
@@ -608,7 +628,7 @@ class Demo:
         else:
             args = ("done", "متن درج شد", f"{fa_digits(words)} کلمه", 0, [0.0] * self.bar.bars)
         state, title, sub, elapsed, lv = args
-        self.bar.draw(p, W / 2, H - 22, 1.55, state, title, sub, elapsed, lv, frame, opacity)
+        self.bar.draw(p, cx, bottom, scale, state, title, sub, elapsed, lv, frame, opacity)
 
     def _intro_outro(self, p, t, show, outro):
         if show <= 0:
@@ -650,14 +670,9 @@ class Demo:
             p.drawText(pill, Qt.AlignCenter, "hajloo.ir/mh-speech-to-text")
         p.restore()
 
-    # ----- one frame -----
-    def frame(self, i):
-        t = i / FPS
-        img = QImage(W, H, QImage.Format_ARGB32_Premultiplied)
-        p = QPainter(img)
-        p.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
-        p.drawImage(0, 0, self.backdrop)
-
+    # ----- layers shared by the site's video and the story -----
+    def windows_layer(self, p, t):
+        """Word and VS Code with the dictated text, in the landscape frame's coordinates."""
         # Word: hold the hotkey
         word = self._window(p, self.word_img, WORD_IN, SWITCH, t, to_x=-260)
         if word:
@@ -702,35 +717,193 @@ class Demo:
                     self._caret(p, x + wdt + 2, line_y + 5, self.code_line_h - 10, t, "#AEAFAD")
                 self._sparkles(p, QRectF(x, line_y, wdt, self.code_line_h), t, CODE_TEXT, 9)
 
-        # recording bar, as the app shows it
+    def pill_layer(self, p, t, i, cx, bottom, scale):
+        """The recording bar, as the app shows it."""
         if WORD_PRESS <= t < SWITCH:
             self._pill(p, t, WORD_PRESS, WORD_RELEASE, WORD_TEXT, "Esc برای لغو",
-                       len(WORD_TEXT_FA.split()), self.levels_word, i)
+                       len(WORD_TEXT_FA.split()), self.levels_word, i, cx, bottom, scale)
         if CODE_TAP1 <= t < OUTRO_IN:
             self._pill(p, t, CODE_TAP1, CODE_TAP2, CODE_TEXT, "پایان با Ctrl + Q",
-                       len(CODE_TEXT_FA.split()), self.levels_code, i)
+                       len(CODE_TEXT_FA.split()), self.levels_code, i, cx, bottom, scale)
 
-        # captions with the hotkey caps
+    @staticmethod
+    def caption_state(t, texts):
+        """(caption, subtitle, how far the keys are pressed, visibility) at t, or None."""
         if WORD_IN + 0.8 <= t < SWITCH + 0.3:
             before = t < WORD_RELEASE
-            cap = "کلید میان‌بر را نگه دارید و صحبت کنید" if before else "رها کنید؛ متن همان‌جا نوشته می‌شود"
-            sub = "کلید دلخواه شما؛ پیش‌فرض Ctrl + Q" if before else None
+            cap, sub = texts[0] if before else texts[1]
             show = min(span(t, WORD_IN + 0.8, WORD_IN + 1.2), 1 - span(t, SWITCH - 0.1, SWITCH + 0.3))
-            flip = span(t, WORD_RELEASE, WORD_RELEASE + 0.3) if not before else 1
+            flip = 1 if before else span(t, WORD_RELEASE, WORD_RELEASE + 0.3)
             pressed = ease_out(span(t, WORD_PRESS - 0.08, WORD_PRESS)) * (1 - span(t, WORD_RELEASE,
                                                                                     WORD_RELEASE + 0.08))
-            self._hud(p, t, cap, sub, pressed, show * (0.4 + 0.6 * flip))
+            return cap, sub, pressed, show * (0.4 + 0.6 * flip)
         if SWITCH + 0.9 <= t < OUTRO_IN:
             before = t < CODE_TAP2
-            cap = "یا یک بار بزنید و صحبت کنید" if before else "دوباره بزنید؛ متن در هر برنامه‌ای نوشته می‌شود"
+            cap, sub = texts[2] if before else texts[3]
             show = min(span(t, SWITCH + 0.9, SWITCH + 1.3), 1 - span(t, OUTRO_IN - 0.4, OUTRO_IN))
-            flip = span(t, CODE_TAP2, CODE_TAP2 + 0.3) if not before else 1
+            flip = 1 if before else span(t, CODE_TAP2, CODE_TAP2 + 0.3)
             pressed = 0.0
             for tap in (CODE_TAP1, CODE_TAP2):
                 pressed = max(pressed, ease_out(span(t, tap - 0.06, tap)) * (1 - span(t, tap + TAP, tap + TAP + 0.08)))
-            self._hud(p, t, cap, None, pressed, show * (0.4 + 0.6 * flip))
+            return cap, sub, pressed, show * (0.4 + 0.6 * flip)
+        return None
 
-        # intro and outro
+    # ----- one frame of the site's video -----
+    def frame(self, i):
+        t = i / FPS
+        img = QImage(W, H, QImage.Format_ARGB32_Premultiplied)
+        p = QPainter(img)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
+        p.drawImage(0, 0, self.backdrop)
+        self.windows_layer(p, t)
+        self.pill_layer(p, t, i, W / 2, H - 22, 1.55)
+        c = self.caption_state(t, CAPTIONS)
+        if c:
+            self._hud(p, t, *c)
+        self._intro_outro(p, t, 1 - ease_in_out(span(t, INTRO_END - 0.4, INTRO_END + 0.2)), outro=False)
+        self._intro_outro(p, t, ease_in_out(span(t, OUTRO_IN, OUTRO_IN + 0.5)), outro=True)
+        p.end()
+        return img
+
+
+class Story:
+    """The same demo as a vertical Instagram story (1080x1920)."""
+
+    def __init__(self, demo):
+        self.d = demo
+        self.layer = QImage(W, H, QImage.Format_ARGB32_Premultiplied)
+        self.backdrop = self._backdrop()
+
+    @staticmethod
+    def _gradient():
+        g = QLinearGradient(0, 0, SW * 0.4, SH)
+        g.setColorAt(0, QColor("#7A5CFF"))
+        g.setColorAt(1, QColor("#21C3E6"))
+        return g
+
+    def _backdrop(self):
+        img = QImage(SW, SH, QImage.Format_ARGB32_Premultiplied)
+        p = QPainter(img)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.fillRect(img.rect(), self._gradient())
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(255, 255, 255, 20))
+        p.drawEllipse(QPointF(SW - 60, 180), 380, 380)
+        p.drawEllipse(QPointF(80, SH - 200), 420, 420)
+        p.end()
+        return img
+
+    def _hud(self, p, cap, sub, pressed, show):
+        """Keys on top, the caption under them: a white card below Instagram's top bar."""
+        d = self.d
+        p.save()
+        p.setOpacity(show)
+        dy = (1 - show) * -20
+        cap_f, sub_f = font(d.fa, 46, 700), font(d.fa, 30, 400)
+        card_h = 36 + 88 + 24 + 70 + (48 if sub else 0) + 30
+        card = QRectF(60, 322 + dy, SW - 120, card_h)
+        soft_shadow(p, card, 30, strength=1.0, spread=24, dy=14)
+        round_rect(p, card, 30, QColor(255, 255, 255, 248))
+        kx = SW / 2 - (156 + 44 + 88) / 2
+        ky = card.top() + 36
+        d._key(p, QRectF(kx, ky, 156, 88), "Ctrl", pressed, px=34)
+        p.setPen(QColor("#8C88A6"))
+        p.setFont(font(d.ui, 36, 600))
+        p.drawText(QRectF(kx + 156, ky, 44, 88), Qt.AlignCenter, "+")
+        d._key(p, QRectF(kx + 200, ky, 88, 88), "Q", pressed, px=34)
+        p.setPen(QColor("#17152A"))
+        p.setFont(cap_f)
+        top = ky + 88 + 24
+        p.drawText(QRectF(card.left() + 30, top, card.width() - 60, 70), cap,
+                   text_opt(Qt.AlignHCenter | Qt.AlignVCenter, True))
+        if sub:
+            p.setPen(QColor("#6B6788"))
+            p.setFont(sub_f)
+            p.drawText(QRectF(card.left() + 30, top + 66, card.width() - 60, 48), sub,
+                       text_opt(Qt.AlignHCenter | Qt.AlignVCenter, True))
+        p.restore()
+
+    def _centered(self, p, text, f, y, h, color, rtl=True):
+        p.setPen(QColor(color))
+        p.setFont(f)
+        p.drawText(QRectF(0, y, SW, h), text, text_opt(Qt.AlignHCenter | Qt.AlignVCenter, rtl))
+
+    def _intro_outro(self, p, t, show, outro):
+        if show <= 0:
+            return
+        d = self.d
+        p.save()
+        p.setOpacity(show)
+        p.drawImage(0, 0, self.backdrop)            # covers the demo below it
+        t0 = OUTRO_IN + 0.2 if outro else 0.15
+        k_logo = ease_back(span(t, t0, t0 + 0.65))
+        size = (230 if outro else 250) * k_logo
+        if size > 1:
+            cy = 640 if outro else 630
+            d.logo.render(p, QRectF(SW / 2 - size / 2, cy - size / 2, size, size))
+        k1 = ease_out(span(t, t0 + 0.3, t0 + 0.95))
+        k2 = ease_out(span(t, t0 + 0.55, t0 + 1.2))
+        k3 = ease_out(span(t, t0 + 0.8, t0 + 1.45))
+        if not outro:
+            p.setOpacity(show * k1)
+            self._centered(p, "تایپ نکنید؛", font(d.fa, 96, 800), 810 + 30 * (1 - k1), 130, "#FFFFFF")
+            p.setOpacity(show * k2)
+            self._centered(p, "فقط حرف بزنید!", font(d.fa, 96, 800), 930 + 30 * (1 - k2), 130, "#FFFFFF")
+            p.setOpacity(show * k3)
+            self._centered(p, "تبدیل گفتار به متن فارسی، تو هر برنامه‌ای", font(d.fa, 40, 500),
+                           1080 + 20 * (1 - k3), 70, "#FFFFFF")
+            self._centered(p, "MH-Speech to Text", font(d.ui, 48, 700), 1160 + 20 * (1 - k3), 70,
+                           "#FFFFFF", rtl=False)
+        else:
+            p.setOpacity(show * k1)
+            self._centered(p, "MH-Speech to Text", font(d.ui, 68, 700), 780 + 30 * (1 - k1), 100,
+                           "#FFFFFF", rtl=False)
+            p.setOpacity(show * k2)
+            self._centered(p, "رایگان و متن‌باز، بدون نیاز به اینترنت", font(d.fa, 42, 500),
+                           890 + 20 * (1 - k2), 70, "#FFFFFF")
+            self._centered(p, "برای ویندوز ۱۰ و ۱۱", font(d.fa, 34, 400), 960 + 20 * (1 - k2), 60,
+                           "#EDEBFF")
+            p.setOpacity(show * k3)
+            self._centered(p, "دانلود رایگان:", font(d.fa, 40, 700), 1090 + 20 * (1 - k3), 70, "#FFFFFF")
+            pill = QRectF(SW / 2 - 450, 1170 + 20 * (1 - k3), 900, 110)
+            round_rect(p, pill, 55, QColor(255, 255, 255, 240))
+            p.setPen(QColor("#5B3FE0"))
+            p.setFont(font(d.ui, 44, 600))
+            p.drawText(pill, Qt.AlignCenter, "hajloo.ir/mh-speech-to-text")
+        p.restore()
+
+    def frame(self, i):
+        t = i / FPS
+        d = self.d
+        self.layer.fill(Qt.transparent)
+        lp = QPainter(self.layer)
+        lp.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
+        d.windows_layer(lp, t)
+        lp.end()
+
+        img = QImage(SW, SH, QImage.Format_ARGB32_Premultiplied)
+        p = QPainter(img)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing | QPainter.SmoothPixmapTransform)
+        p.drawImage(0, 0, self.backdrop)
+        # the window, cropped around the text; the camera pans when the app changes
+        k_in = ease_out(span(t, WORD_IN, WORD_IN + 0.7))
+        if k_in > 0:
+            k = ease_in_out(span(t, SWITCH, SWITCH + 0.9))
+            crop_x = CROP_WORD_X + (CROP_CODE_X - CROP_WORD_X) * k
+            src = QRectF(crop_x, CROP_Y, CROP_W, CROP_W * STORY_CARD.height() / STORY_CARD.width())
+            p.save()
+            p.setOpacity(k_in)
+            soft_shadow(p, STORY_CARD, 28, strength=1.4, spread=34, dy=20)
+            clip = QPainterPath()
+            clip.addRoundedRect(STORY_CARD, 28, 28)
+            p.setClipPath(clip)
+            p.fillRect(STORY_CARD, QColor("#FFFFFF") if t < SWITCH + 0.45 else QColor("#1F1F1F"))
+            p.drawImage(STORY_CARD, self.layer, src)
+            p.restore()
+        c = d.caption_state(t, STORY_CAPTIONS)
+        if c:
+            self._hud(p, *c)
+        d.pill_layer(p, t, i, SW / 2, STORY_CARD.bottom() + 111, 2.1)
         self._intro_outro(p, t, 1 - ease_in_out(span(t, INTRO_END - 0.4, INTRO_END + 0.2)), outro=False)
         self._intro_outro(p, t, ease_in_out(span(t, OUTRO_IN, OUTRO_IN + 0.5)), outro=True)
         p.end()
@@ -858,20 +1031,21 @@ def to_rgb(img):
     return arr[:, : img.width() * 3].reshape(img.height(), img.width(), 3).copy()
 
 
-def encode(demo, out):
+def encode(render, size, out):
+    """render(i) -> QImage of frame i; size = (width, height)."""
     audio = soundtrack()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".partial.mp4")
     container = av.open(str(tmp), "w", options={"movflags": "+faststart"})
     v = container.add_stream("libx264", rate=FPS,
                              options={"crf": "21", "preset": "slow", "tune": "animation", "profile": "high"})
-    v.width, v.height, v.pix_fmt = W, H, "yuv420p"
+    (v.width, v.height), v.pix_fmt = size, "yuv420p"
     a = container.add_stream("aac", rate=SR, layout="stereo")
     a.bit_rate = 160_000
     n_frames = int(DURATION * FPS)
     apos = 0
     for i in range(n_frames):
-        frame = av.VideoFrame.from_ndarray(to_rgb(demo.frame(i)), format="rgb24")
+        frame = av.VideoFrame.from_ndarray(to_rgb(render(i)), format="rgb24")
         frame.pts = i
         for packet in v.encode(frame):
             container.mux(packet)
@@ -897,21 +1071,34 @@ def encode(demo, out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--frames", help="comma-separated times (s): save PNG stills only")
-    ap.add_argument("--out", default=str(SITE))
+    ap.add_argument("--story", action="store_true",
+                    help="the vertical Instagram story (build/promo/instagram-story.mp4) instead")
+    ap.add_argument("--out", help="output folder (default: the site folder, or build/promo for --story)")
     args = ap.parse_args()
     app = QApplication(sys.argv)  # Qt needs an application for fonts and widgets
     app.setApplicationName("MH-Speech to Text demo")
     demo = Demo()
-    out = Path(args.out)
+    if args.story:
+        render, size = Story(demo).frame, (SW, SH)
+        out = Path(args.out or ROOT / "build" / "promo")
+    else:
+        render, size = demo.frame, (W, H)
+        out = Path(args.out or SITE)
     if args.frames:
         out.mkdir(parents=True, exist_ok=True)
+        prefix = "story" if args.story else "demo"
         for s in args.frames.split(","):
-            demo.frame(int(float(s) * FPS)).save(str(out / f"demo_{float(s):05.1f}.png"))
+            render(int(float(s) * FPS)).save(str(out / f"{prefix}_{float(s):05.1f}.png"))
         print("stills ->", out)
         return
+    print(f"rendering {DURATION:.0f}s at {size[0]}x{size[1]}, {FPS} fps")
+    if args.story:
+        video = out / "instagram-story.mp4"
+        encode(render, size, video)
+        print(f"{video}: {video.stat().st_size / 1e6:.1f} MB")
+        return
     video = out / "media" / "demo.mp4"
-    print(f"rendering {DURATION:.0f}s at {W}x{H}, {FPS} fps")
-    encode(demo, video)
+    encode(render, size, video)
     poster = Image.fromarray(to_rgb(demo.frame(int((WORD_TEXT + 0.9) * FPS))))
     poster.resize((1280, 720), Image.LANCZOS).save(out / "img" / "demo-poster.webp", quality=84)
     print(f"{video.relative_to(ROOT)}: {video.stat().st_size / 1e6:.1f} MB; poster img/demo-poster.webp")
