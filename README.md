@@ -77,3 +77,7 @@ python -m venv .venv
 طراحی و توسعه: محمد حاجلو · [www.hajloo.ir](https://www.hajloo.ir) · [github.com/mhajloo](https://github.com/mhajloo/)
 
 </div>
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). Team roles and the privacy policy: [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
